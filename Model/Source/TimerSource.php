@@ -30,7 +30,7 @@ class TimerSource extends Base implements ActivitySource
         $projectId = $this->db->escapeIdentifier('project_id', TaskModel::TABLE);
 
         $query = $this->db->table($table)
-            ->columns($userId, $projectId, $end, $this->db->escapeIdentifier('time_spent', $table))
+            ->columns($userId, $projectId, $this->db->escapeIdentifier('start', $table), $end, $this->db->escapeIdentifier('time_spent', $table))
             ->join(SubtaskModel::TABLE, 'id', 'subtask_id')
             ->join(TaskModel::TABLE, 'id', 'task_id', SubtaskModel::TABLE)
             ->in($projectId, $projectIds)
@@ -49,7 +49,20 @@ class TimerSource extends Base implements ActivitySource
             'ts'         => (int) $timer['end'],
             'type'       => 'time',
             'count'      => 0,
-            'hours'      => (float) $timer['time_spent'],
+            'hours'      => $this->hours($timer),
         ], $query->findAll());
+    }
+
+    /** time_spent, or the start-to-end span when it is 0 (TimeReport's rowHours parity). */
+    private function hours(array $timer): float
+    {
+        $timeSpent = (float) $timer['time_spent'];
+        if ($timeSpent > 0) {
+            return $timeSpent;
+        }
+        $start = (int) $timer['start'];
+        $end = (int) $timer['end'];
+
+        return $end > $start ? ($end - $start) / 3600 : 0.0;
     }
 }

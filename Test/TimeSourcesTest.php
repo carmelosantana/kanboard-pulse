@@ -75,6 +75,15 @@ class TimeSourcesTest extends Base
         ]);
     }
 
+    public function testTimerHoursFallBackToStartAndEndWhenTimeSpentIsZero(): void
+    {
+        $this->timer($this->s1, 1000, 1000 + 5400, 2.0);   // time_spent wins
+        $this->timer($this->s1, 2000, 2000 + 5400, 0.0);   // 1.5 h from start/end
+        $this->timer($this->s1, 9000, 8000, 0.0);          // end before start: nothing
+
+        $this->assertSame([2.0, 1.5, 0.0], array_column($this->timers->fetch([], [$this->p1], 0, 2000000000), 'hours'));
+    }
+
     public function testTypes(): void
     {
         $this->assertSame(['time'], $this->timers->types());
