@@ -1,0 +1,15 @@
+{
+    "name": "Pulse",
+    "description": "A GitHub-style activity heatmap for you, your agents and your projects.",
+    "version": "1.0.0",
+    "author": "Carmelo Santana",
+    "homepage": "https://github.com/carmelosantana/kanboard-pulse",
+    "license": "MIT",
+    "kanboard_version": ">=1.2.47",
+    "php_version": ">=8.4",
+    "requires": [],
+    "recommends": [
+        { "plugin": "Agents", "min_version": "0.4.1", "reason": "shows your agents' graphs next to yours" },
+        { "plugin": "TimeReport", "min_version": "1.7.1", "reason": "counts manually entered time as time logged" }
+    ]
+}
