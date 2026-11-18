@@ -52,7 +52,7 @@ class HeatmapBuilderTest extends Base
 
     public function testLocalDayBucketing(): void
     {
-        $ts = (new \DateTimeImmutable('2026-06-11 23:30:00', new \DateTimeZone('UTC')))->getTimestamp();
+        $ts = (new \DateTimeImmutable('2026-06-12 02:30:00', new \DateTimeZone('UTC')))->getTimestamp();
         $graph = $this->build([['user_id' => 1, 'project_id' => 1, 'ts' => $ts, 'type' => 'task', 'count' => 1, 'hours' => 0.0]]);
 
         $this->assertSame(1.0, $graph['days']['2026-06-11']['n']);
