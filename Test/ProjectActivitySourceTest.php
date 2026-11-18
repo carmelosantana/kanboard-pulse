@@ -159,6 +159,28 @@ class ProjectActivitySourceTest extends Base
         $this->assertSame(1000, $rows[0]['ts']);
     }
 
+    public function testLaterEditByAnotherUserDoesNotCreditAnOldCompletion(): void
+    {
+        $this->event('subtask.update', 500, $this->subtaskData(7, SubtaskModel::STATUS_DONE), 1);
+        $this->event('subtask.update', 1500, $this->subtaskData(7, SubtaskModel::STATUS_DONE, 'Renamed'), $this->u2);
+
+        $this->assertSame([], $this->fetch([$this->u2], null, 1000, 2000));
+    }
+
+    public function testCompletionFollowsTheProjectItWasDoneIn(): void
+    {
+        // Done in project Two, then the task moved to One and the done subtask was edited there.
+        $this->event('subtask.update', 1100, $this->subtaskData(7, SubtaskModel::STATUS_DONE), 1, $this->p2, $this->t1);
+        $this->event('task.move.project', 1200, [], 1, $this->p1, $this->t1);
+        $this->event('subtask.update', 1500, $this->subtaskData(7, SubtaskModel::STATUS_DONE, 'Renamed'), 1, $this->p1, $this->t1);
+
+        $this->assertSame(['move'], array_column($this->fetch([], [$this->p1], 1000, 2000), 'type'));
+
+        $rows = $this->fetch([], [$this->p2], 1000, 2000);
+        $this->assertCount(1, $rows);
+        $this->assertSame(['subtask', $this->p2, 1100], [$rows[0]['type'], $rows[0]['project_id'], $rows[0]['ts']]);
+    }
+
     public function testDecodesSerializedAndJson(): void
     {
         $this->event('subtask.update', 1000, serialize($this->subtaskData(7, SubtaskModel::STATUS_DONE)));

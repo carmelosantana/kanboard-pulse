@@ -74,7 +74,8 @@ class ProjectActivitySource extends Base implements ActivitySource
 
     /**
      * One completion per subtask: its earliest done snapshot by any user, at any date, so later
-     * edits of a done subtask are not re-counted. Credited to that row's creator, then filtered.
+     * edits of a done subtask are not re-counted, even after the task changed project. Credited to
+     * that row's creator and project, then filtered.
      *
      * @return list<array>
      */
@@ -98,7 +99,8 @@ class ProjectActivitySource extends Base implements ActivitySource
             return [];
         }
 
-        $updates = $this->query([], $projectIds)
+        // No project filter: a done row written before a task.move.project still counts as first.
+        $updates = $this->db->table(ProjectActivityModel::TABLE)
             ->columns('creator_id', 'project_id', 'date_creation', 'data')
             ->eq('event_name', 'subtask.update')
             ->in('task_id', array_keys($taskIds))
@@ -115,9 +117,13 @@ class ProjectActivitySource extends Base implements ActivitySource
             }
         }
 
+        $users = array_map('intval', $userIds);
+        $projects = array_map('intval', $projectIds);
+
         return array_values(array_filter($first, fn (array $event) =>
             (int) $event['date_creation'] >= $from
-            && ($userIds === [] || in_array((int) $event['creator_id'], array_map('intval', $userIds), true))
+            && in_array((int) $event['project_id'], $projects, true)
+            && ($users === [] || in_array((int) $event['creator_id'], $users, true))
         ));
     }
 
