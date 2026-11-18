@@ -42,13 +42,14 @@ if (count($months) > 1 && $months[1]['column'] - $months[0]['column'] < 3) {
                 <span style="grid-column: <?= (int) $label['column'] ?>"><?= $this->text->e(t((new \DateTimeImmutable($label['month'].'-01'))->format('M'))) ?></span>
                 <?php endforeach ?>
             </div>
-            <div class="pulse-grid">
+            <div class="pulse-grid" role="group" aria-label="<?= t('Activity per day for %s. Use the arrow keys to move between days.', $graph['name'] ?? '#'.$userId) ?>">
+                <?php $today = array_key_last($graph['days']); ?>
                 <?php foreach ($graph['days'] as $date => $day):
                     $tip = PulseService::dayTip($date, $day, $project_names);
                     $type = $day['top_type'];
                     $project = $day['top_project'];
                 ?>
-                <span class="pulse-cell" tabindex="0" role="img"
+                <span class="pulse-cell" tabindex="<?= $date === $today ? '0' : '-1' ?>" role="img"
                       aria-label="<?= $this->text->e($tip) ?>"
                       data-date="<?= $this->text->e($date) ?>"
                       data-level="<?= (int) $day['level'] ?>"

@@ -157,6 +157,13 @@ class TemplatesTest extends Base
         $this->assertMatchesRegularExpression('/data-pulse-legend="type" hidden>\s*<span class="pulse-legend-item"><span class="pulse-swatch" style="background: #eb6834"><\/span>Comments<\/span>/', $html);
         $this->assertMatchesRegularExpression('/data-pulse-legend="project" hidden>\s*<span class="pulse-legend-item"><span class="pulse-swatch" style="background: [^"]+"><\/span>&lt;script&gt;alert\(1\)&lt;\/script&gt;<\/span>/', $html);
         $this->assertStringContainsString('<p class="pulse-total">2 events in the last 12 months</p>', $html);
+
+        // One tab stop per grid, on today (the last cell); arrows move it from there.
+        $today = array_key_last($data['graphs'][0]['days']);
+        $this->assertSame(1, substr_count($html, 'tabindex="0"'));
+        $this->assertSame(count($data['graphs'][0]['days']) - 1, substr_count($html, 'tabindex="-1"'));
+        $this->assertMatchesRegularExpression('/tabindex="0"[^>]*data-date="'.$today.'"/', $html);
+        $this->assertMatchesRegularExpression('/class="pulse-grid" role="group" aria-label="[^"]*alice[^"]*arrow keys/', $html);
         $this->assertStringNotContainsString('<script>', $html);
     }
 

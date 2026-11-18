@@ -1,4 +1,5 @@
-// Pulse heatmap: per-graph colour-mode switch (person/type/project, with its legend) and one shared hover/focus tooltip.
+// Pulse heatmap: per-graph colour-mode switch (person/type/project, with its legend), arrow-key day navigation
+// (one tab stop per grid) and one shared hover/focus tooltip that Escape closes from anywhere.
 // Loaded on every page via template:layout:js (CSP forbids inline script), so init() no-ops without a .pulse-graph.
 // Shade comes from CSS (opacity by data-level); this file only picks the hue, via the cell's --pulse-h.
 (function (window, document) {
@@ -27,6 +28,35 @@
     graph.dataset.pulseMode = mode;
   }
 
+  // Cells flow down 7-day columns, so a day is ±1 and a week is ±7. A move past either end stays put.
+  var STEPS = { ArrowUp: -1, ArrowDown: 1, ArrowLeft: -7, ArrowRight: 7 };
+  function nextIndex(index, key, count) {
+    if (key === 'Home') return 0;
+    if (key === 'End') return count - 1;
+    if (!STEPS.hasOwnProperty(key)) return null;
+    var next = index + STEPS[key];
+    return next < 0 || next >= count ? index : next;
+  }
+
+  // Roving tabindex: the grid is one tab stop, on the cell that last had focus.
+  function rove(graph, cell) {
+    var cells = graph.querySelectorAll('.pulse-cell');
+    for (var i = 0; i < cells.length; i++) cells[i].setAttribute('tabindex', cells[i] === cell ? '0' : '-1');
+  }
+
+  function onArrow(graph, e) {
+    var cell = cellOf(e.target);
+    if (!cell) return;
+    var cells = graph.querySelectorAll('.pulse-cell');
+    var index = Array.prototype.indexOf.call(cells, cell);
+    var next = nextIndex(index, e.key, cells.length);
+    if (next === null) return;
+    e.preventDefault();
+    if (next !== index) cells[next].focus();
+  }
+
+  function onDocumentKeydown(e) { if (e.key === 'Escape') hideTip(); }
+
   function cellOf(target) {
     return target && target.classList && target.classList.contains('pulse-cell') && target.dataset.tip ? target : null;
   }
@@ -40,6 +70,7 @@
       document.body.appendChild(tip);
     }
     tip.textContent = cell.dataset.tip;
+    if (tip.hidden) document.addEventListener('keydown', onDocumentKeydown);
     tip.hidden = false;
     var r = cell.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight;
     var left = Math.max(4, Math.min(r.left + r.width / 2 - w / 2, document.documentElement.clientWidth - w - 4));
@@ -48,7 +79,11 @@
     tip.style.top = (top + window.pageYOffset) + 'px';
   }
 
-  function hideTip() { if (tip) tip.hidden = true; }
+  function hideTip() {
+    if (!tip || tip.hidden) return;
+    tip.hidden = true;
+    document.removeEventListener('keydown', onDocumentKeydown);
+  }
 
   function bind(graph) {
     if (graph.dataset.pulseBound) return;
@@ -58,10 +93,10 @@
       if (button) setMode(graph, button.dataset.pulseMode);
     });
     graph.addEventListener('mouseover', function (e) { var c = cellOf(e.target); if (c) showTip(c); });
-    graph.addEventListener('focusin', function (e) { var c = cellOf(e.target); if (c) showTip(c); });
+    graph.addEventListener('focusin', function (e) { var c = cellOf(e.target); if (c) { rove(graph, c); showTip(c); } });
     graph.addEventListener('mouseout', function (e) { if (cellOf(e.target)) hideTip(); });
     graph.addEventListener('focusout', hideTip);
-    graph.addEventListener('keydown', function (e) { if (e.key === 'Escape') hideTip(); });
+    graph.addEventListener('keydown', function (e) { onArrow(graph, e); });
   }
 
   function init(root) {
@@ -69,6 +104,6 @@
     for (var i = 0; i < graphs.length; i++) bind(graphs[i]);
   }
 
-  window.KBPulse = { colorFor: colorFor, init: init };
+  window.KBPulse = { colorFor: colorFor, nextIndex: nextIndex, init: init };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { init(); }); else init();
 })(window, document);
