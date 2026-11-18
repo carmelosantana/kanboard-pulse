@@ -191,8 +191,8 @@ The seed creates `demo.ana` (manager of "Demo Web"), `demo.ben` (member of "Demo
 Ops", identifiers `PULSEDEMOWEB` / `PULSEDEMOOPS`) and `demo.ana.bot` (Ana's agent), with a year of
 every activity type. Their dev-only password is in the script. Re-running rebuilds only the projects
 with those identifiers, without duplicating anything. It refuses to run outside the dev container,
-when a `webhook_url` is configured, or when a "Demo Web"/"Demo Ops" project exists without the demo
-identifier, and it drops every queued job so seeding sends no notifications or webhooks.
+when a `webhook_url` is configured, when a "Demo Web"/"Demo Ops" project exists without the demo
+identifier, or when a user with a demo username lacks the `pulse_demo` user metadata, and it drops every queued job so seeding sends no notifications or webhooks.
 
 ## License
 

@@ -13,7 +13,10 @@
  * - CLI only, inside the suite's dev container: Docker's /.dockerenv plus the suite's own
  *   entrypoint (/usr/local/bin/entrypoint-dev.sh, mounted from testing/entrypoint-dev.sh), on SQLite;
  * - no webhook_url configured (the dev DB is an import of production);
- * - a project named "Demo Web" / "Demo Ops" without the demo identifier is never touched: refuse.
+ * - a project named "Demo Web" / "Demo Ops" without the demo identifier is never touched: refuse;
+ * - a user named demo.ana / demo.ben / demo.ana.bot without the pulse_demo=1 user metadata is never
+ *   touched: refuse. (Once, for users made by earlier unmarked runs, a user whose username AND display
+ *   name both match the seed's exactly is adopted: marked, then refreshed.)
  * Core models queue event jobs (notifications, webhooks, other plugins' subscribers); the queue
  * is replaced by one that drops every job, so seeding notifies nothing and no one.
  */
@@ -27,6 +30,8 @@ use Kanboard\Model\CommentModel;
 
 const DEMO_PASSWORD = 'pulse-demo-2026'; // dev-only, demo users only
 const DEMO_PROJECTS = ['PULSEDEMOWEB' => 'Demo Web', 'PULSEDEMOOPS' => 'Demo Ops']; // identifier => name
+const DEMO_USERS = ['demo.ana' => 'Ana (demo)', 'demo.ben' => 'Ben (demo)', 'demo.ana.bot' => "Ana's bot (demo)"]; // username => name
+const DEMO_MARKER = 'pulse_demo'; // user metadata, '1' on users this seed owns
 const KANBOARD_ROOT = '/var/www/app';
 
 function refuse(string $why): never
@@ -56,14 +61,28 @@ if (trim((string) $container['configModel']->get('webhook_url')) !== '') {
 }
 
 foreach (DEMO_PROJECTS as $identifier => $name) {
-    $project = $container['projectModel']->getByName($name);
-    if ($project && $project['identifier'] !== $identifier) {
+    // Counted, not getByName(): a tagged and an untagged project of the same name may coexist.
+    $named = $db->table('projects')->eq('name', $name)->count();
+    $namedAndTagged = $db->table('projects')->eq('name', $name)->eq('identifier', $identifier)->count();
+    if ($named > $namedAndTagged) {
         refuse("a project named \"$name\" exists without the identifier $identifier; it is not seed data");
     }
     $tagged = $container['projectModel']->getByIdentifier($identifier);
     if ($tagged && $tagged['name'] !== $name) {
         refuse("project $identifier is named \"{$tagged['name']}\", expected \"$name\"");
     }
+}
+
+$adopt = []; // unmarked users from earlier runs whose username and name match exactly
+foreach (DEMO_USERS as $username => $name) {
+    $user = $container['userModel']->getByUsername($username);
+    if (! $user || $container['userMetadataModel']->get($user['id'], DEMO_MARKER) === '1') {
+        continue;
+    }
+    if ($user['username'] !== $username || $user['name'] !== $name) {
+        refuse("user $username exists without the ".DEMO_MARKER." marker and is not this seed's \"$name\"; it is not seed data");
+    }
+    $adopt[] = (int) $user['id'];
 }
 
 /** Drops every job: no notifications, webhooks or third-party subscribers fire while seeding. */
@@ -85,10 +104,18 @@ mt_srand(20261118); // same data shape on every run
 
 // ---- users -------------------------------------------------------------------------------
 
+foreach ($adopt as $userId) {
+    $container['userMetadataModel']->save($userId, [DEMO_MARKER => '1']);
+}
+
+/** Creates the demo user, or refreshes it when it carries the marker (checked above, before any write). */
 function demoUser(Pimple\Container $c, string $username, string $name): int
 {
     $user = $c['userModel']->getByUsername($username);
     if ($user) {
+        if ($c['userMetadataModel']->get($user['id'], DEMO_MARKER) !== '1') {
+            refuse("user $username lost its ".DEMO_MARKER.' marker'); // unreachable after the checks above
+        }
         $c['userModel']->update(['id' => $user['id'], 'password' => DEMO_PASSWORD, 'name' => $name, 'role' => Role::APP_USER, 'is_active' => 1]);
         return (int) $user['id'];
     }
@@ -101,12 +128,11 @@ function demoUser(Pimple\Container $c, string $username, string $name): int
     if (! $id) {
         refuse("could not create $username");
     }
+    $c['userMetadataModel']->save($id, [DEMO_MARKER => '1']);
     return (int) $id;
 }
 
-$ana = demoUser($container, 'demo.ana', 'Ana (demo)');
-$ben = demoUser($container, 'demo.ben', 'Ben (demo)');
-$bot = demoUser($container, 'demo.ana.bot', "Ana's bot (demo)");
+[$ana, $ben, $bot] = array_map(fn ($username) => demoUser($container, $username, DEMO_USERS[$username]), array_keys(DEMO_USERS));
 
 $agentTable = '\Kanboard\Plugin\Agents\Model\AgentTable';
 if (class_exists($agentTable)) {
@@ -283,3 +309,6 @@ printf("seed-demo: %d activity rows, %d timers, %s manual time rows\n",
     $db->table(SubtaskTimeTrackingModel::TABLE)->in('user_id', [$ana, $ben, $bot])->count(),
     $hasManualLedger ? (string) $db->table('timereport_manual_time')->in('user_id', [$ana, $ben, $bot])->count() : 'no');
 printf("seed-demo: %d queued jobs dropped (no notifications or webhooks sent)\n", $queue->dropped);
+if ($adopt !== []) {
+    printf("seed-demo: adopted %d unmarked demo user(s) from an earlier run: ids %s\n", count($adopt), implode(',', $adopt));
+}
