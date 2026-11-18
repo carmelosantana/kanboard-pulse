@@ -146,6 +146,19 @@ class ProjectActivitySourceTest extends Base
         $this->assertSame([], $this->fetch([], null, 1000, 2000));
     }
 
+    public function testCompletionIsCreditedToFirstDoneRowByAnyUser(): void
+    {
+        $this->event('subtask.update', 1000, $this->subtaskData(7, SubtaskModel::STATUS_DONE), 1);
+        $this->event('subtask.update', 1100, $this->subtaskData(7, SubtaskModel::STATUS_DONE, 'Renamed'), $this->u2);
+
+        $this->assertSame([], $this->fetch([$this->u2]));
+
+        $rows = $this->fetch([1]);
+        $this->assertCount(1, $rows);
+        $this->assertSame(1, $rows[0]['user_id']);
+        $this->assertSame(1000, $rows[0]['ts']);
+    }
+
     public function testDecodesSerializedAndJson(): void
     {
         $this->event('subtask.update', 1000, serialize($this->subtaskData(7, SubtaskModel::STATUS_DONE)));

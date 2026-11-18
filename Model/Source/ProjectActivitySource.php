@@ -63,11 +63,8 @@ class ProjectActivitySource extends Base implements ActivitySource
             $rows[] = $this->row($event, $type);
         }
 
-        foreach ($this->completions($userIds, $projectIds) as $event) {
-            $ts = (int) $event['date_creation'];
-            if ($ts >= $from && $ts <= $to) {
-                $rows[] = $this->row($event, 'subtask');
-            }
+        foreach ($this->completions($userIds, $projectIds, $from, $to) as $event) {
+            $rows[] = $this->row($event, 'subtask');
         }
 
         usort($rows, fn (array $a, array $b) => $a['ts'] <=> $b['ts']);
@@ -76,32 +73,62 @@ class ProjectActivitySource extends Base implements ActivitySource
     }
 
     /**
-     * The earliest done snapshot per subtask, at any date: later edits of a done subtask are not re-counted.
+     * One completion per subtask: its earliest done snapshot by any user, at any date, so later
+     * edits of a done subtask are not re-counted. Credited to that row's creator, then filtered.
      *
      * @return list<array>
      */
-    private function completions(array $userIds, array $projectIds): array
+    private function completions(array $userIds, array $projectIds, int $from, int $to): array
     {
-        $updates = $this->query($userIds, $projectIds)
+        // Only tasks with a done snapshot in range can hold an in-range completion.
+        $candidates = $this->query($userIds, $projectIds)
+            ->columns('task_id', 'data')
+            ->eq('event_name', 'subtask.update')
+            ->gte('date_creation', $from)
+            ->lte('date_creation', $to)
+            ->findAll();
+
+        $taskIds = [];
+        foreach ($candidates as $event) {
+            if ($this->doneSubtaskId((string) $event['data']) !== null) {
+                $taskIds[(int) $event['task_id']] = true;
+            }
+        }
+        if ($taskIds === []) {
+            return [];
+        }
+
+        $updates = $this->query([], $projectIds)
             ->columns('creator_id', 'project_id', 'date_creation', 'data')
             ->eq('event_name', 'subtask.update')
+            ->in('task_id', array_keys($taskIds))
+            ->lte('date_creation', $to)
             ->asc('date_creation')
             ->asc('id')
             ->findAll();
 
         $first = [];
         foreach ($updates as $event) {
-            $subtask = $this->decode((string) $event['data'])['subtask'] ?? null;
-            if (! is_array($subtask) || ! isset($subtask['id'], $subtask['status'])) {
-                continue;
+            $subtaskId = $this->doneSubtaskId((string) $event['data']);
+            if ($subtaskId !== null && ! isset($first[$subtaskId])) {
+                $first[$subtaskId] = $event;
             }
-            if ((int) $subtask['status'] !== SubtaskModel::STATUS_DONE || isset($first[$subtask['id']])) {
-                continue;
-            }
-            $first[$subtask['id']] = $event;
         }
 
-        return array_values($first);
+        return array_values(array_filter($first, fn (array $event) =>
+            (int) $event['date_creation'] >= $from
+            && ($userIds === [] || in_array((int) $event['creator_id'], array_map('intval', $userIds), true))
+        ));
+    }
+
+    /** The subtask id when the row's snapshot is done, else null (including undecodable rows). */
+    private function doneSubtaskId(string $data): ?int
+    {
+        $subtask = $this->decode($data)['subtask'] ?? null;
+        if (! is_array($subtask) || ! isset($subtask['id'], $subtask['status'])) {
+            return null;
+        }
+        return (int) $subtask['status'] === SubtaskModel::STATUS_DONE ? (int) $subtask['id'] : null;
     }
 
     private function query(array $userIds, array $projectIds)
