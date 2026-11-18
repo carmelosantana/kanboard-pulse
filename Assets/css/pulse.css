@@ -44,6 +44,13 @@
 .pulse-cell[data-level="4"]::before { opacity: 1; }
 .pulse-cell:focus-visible { outline: 2px solid var(--ring, currentColor); outline-offset: 1px; }
 
+.pulse-footer { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; margin-top: 4px; font-size: 12px; color: var(--muted-foreground, var(--color-light, #777)); }
+.pulse-total { margin: 0; }
+.pulse-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.pulse-legend[hidden] { display: none; }
+.pulse-legend-item { display: inline-flex; align-items: center; gap: 4px; }
+.pulse-swatch { flex: none; width: 10px; height: 10px; border-radius: 2px; }
+
 .pulse-tip {
   position: absolute; z-index: 1000; pointer-events: none; max-width: 280px;
   padding: 6px 8px; border-radius: 6px; font-size: 12px; line-height: 1.4;

@@ -48,7 +48,8 @@ test('init does nothing on a page without graphs', () => {
 test('a mode click recolours the cells and marks only that button pressed', () => {
   const cells = [el({ dataset: { level: '2', typeColor: '#e11d48', projectColor: '#0891b2' } }), el({ dataset: { level: '0', typeColor: '', projectColor: '' } })];
   const buttons = ['person', 'type', 'project'].map((m) => el({ dataset: { pulseMode: m } }));
-  const graph = el({ querySelectorAll: (sel) => (sel === '.pulse-cell' ? cells : buttons) });
+  const legends = ['person', 'type', 'project'].map((m) => el({ dataset: { pulseLegend: m }, hidden: m !== 'person' }));
+  const graph = el({ querySelectorAll: (sel) => ({ '.pulse-cell': cells, '[data-pulse-mode]': buttons, '[data-pulse-legend]': legends })[sel] || [] });
   graph.style['--pulse-c'] = '#2563eb';
   buttons.forEach((b) => { b.closest = (sel) => (sel === '[data-pulse-mode]' ? b : null); });
   P.init({ querySelectorAll: () => [graph] });
@@ -60,9 +61,11 @@ test('a mode click recolours the cells and marks only that button pressed', () =
   assert.equal(graph.dataset.pulseMode, 'type');
   assert.deepEqual(buttons.map((b) => b.getAttribute('aria-pressed')), ['false', 'true', 'false']);
   assert.deepEqual(buttons.map((b) => b.classList.contains('active')), [false, true, false]);
+  assert.deepEqual(legends.map((l) => l.hidden), [true, false, true], 'only the type legend shows');
 
   graph.fire('click', { target: buttons[0] });
   assert.equal(cells[0].style['--pulse-h'], '#2563eb');
+  assert.deepEqual(legends.map((l) => l.hidden), [false, true, true]);
 });
 
 test('init binds a graph only once', () => {

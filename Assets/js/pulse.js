@@ -1,4 +1,4 @@
-// Pulse heatmap: per-graph colour-mode switch (person/type/project) and one shared hover/focus tooltip.
+// Pulse heatmap: per-graph colour-mode switch (person/type/project, with its legend) and one shared hover/focus tooltip.
 // Loaded on every page via template:layout:js (CSP forbids inline script), so init() no-ops without a .pulse-graph.
 // Shade comes from CSS (opacity by data-level); this file only picks the hue, via the cell's --pulse-h.
 (function (window, document) {
@@ -22,6 +22,8 @@
       buttons[j].classList.toggle('active', on);
       buttons[j].setAttribute('aria-pressed', on ? 'true' : 'false');
     }
+    var legends = graph.querySelectorAll('[data-pulse-legend]');
+    for (var k = 0; k < legends.length; k++) legends[k].hidden = legends[k].dataset.pulseLegend !== mode;
     graph.dataset.pulseMode = mode;
   }
 

@@ -61,4 +61,17 @@ if (count($months) > 1 && $months[1]['column'] - $months[0]['column'] < 3) {
             </div>
         </div>
     </div>
+    <?php if ($graph['total'] > 0):
+        $legend = PulseService::legend($graph, $project_colors, $project_names);
+        $legend['person'] = [['label' => $graph['name'] ?? '#'.$userId, 'color' => $personColor]];
+    ?>
+    <div class="pulse-footer">
+        <p class="pulse-total"><?= $this->text->e(PulseService::totalLine($graph)) ?></p>
+        <?php foreach (['person', 'type', 'project'] as $mode): ?>
+        <div class="pulse-legend" data-pulse-legend="<?= $mode ?>"<?= $mode === 'person' ? '' : ' hidden' ?>>
+            <?php foreach ($legend[$mode] as $item): ?><span class="pulse-legend-item"><span class="pulse-swatch" style="background: <?= $this->text->e($item['color']) ?>"></span><?= $this->text->e($item['label']) ?></span><?php endforeach ?>
+        </div>
+        <?php endforeach ?>
+    </div>
+    <?php endif ?>
 </div>

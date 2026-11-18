@@ -9,8 +9,8 @@ namespace Kanboard\Plugin\Pulse\Model;
  */
 class HeatmapBuilder
 {
-    /** Tie-break order for a day's dominant type; unknown types sort after these, alphabetically. */
-    private const TYPE_ORDER = ['move', 'task', 'comment', 'subtask', 'file', 'time'];
+    /** Canonical type order (tie-breaks, tips, legend); unknown types sort after these, alphabetically. */
+    public const TYPE_ORDER = ['move', 'task', 'comment', 'subtask', 'file', 'time'];
 
     /**
      * The window shown: from the Sunday 52 weeks before this week's Sunday to the end of today,
@@ -39,6 +39,8 @@ class HeatmapBuilder
         $start = self::range($today)['start'];
         $days = self::emptyDays($start, $today->format('Y-m-d'));
         $total = 0.0;
+        $types = [];
+        $projects = [];
 
         foreach ($rows as $row) {
             if ((int) $row['user_id'] !== $userId) {
@@ -57,6 +59,10 @@ class HeatmapBuilder
             $day['types'][$type]['count'] += (int) $row['count'];
             $day['types'][$type]['hours'] += (float) $row['hours'];
             $day['projects'][$pid] = ($day['projects'][$pid] ?? 0.0) + $n;
+            $types[$type] ??= ['count' => 0, 'hours' => 0.0];
+            $types[$type]['count'] += (int) $row['count'];
+            $types[$type]['hours'] += (float) $row['hours'];
+            $projects[$pid] = ($projects[$pid] ?? 0.0) + $n;
             $total += $n;
             unset($day);
         }
@@ -74,6 +80,8 @@ class HeatmapBuilder
             'start' => $start,
             'weeks' => intdiv(count($days) + 6, 7),
             'total' => $total,
+            'types' => $types,
+            'projects' => $projects,
             'days' => $days,
         ];
     }
@@ -126,7 +134,7 @@ class HeatmapBuilder
     }
 
     /** Known types by position, unknown ones after them in alphabetical order. */
-    private static function typeRank(string $type): array
+    public static function typeRank(string $type): array
     {
         $pos = array_search($type, self::TYPE_ORDER, true);
         return $pos === false ? [count(self::TYPE_ORDER), $type] : [$pos, ''];

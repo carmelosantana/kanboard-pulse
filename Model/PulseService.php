@@ -10,9 +10,6 @@ use Kanboard\Model\ProjectModel;
  */
 class PulseService extends Base
 {
-    /** Tip order for known types; unknown types follow, alphabetically. */
-    private const TYPE_ORDER = ['move', 'task', 'comment', 'subtask', 'file'];
-
     /**
      * Your page: you (or, for an admin, the picked person) plus owned agents.
      *
@@ -106,11 +103,7 @@ class PulseService extends Base
         $label = (new \DateTimeImmutable($date))->format('M j, Y');
 
         $types = $day['types'];
-        uksort($types, function ($a, $b) {
-            $ra = array_search($a, self::TYPE_ORDER, true);
-            $rb = array_search($b, self::TYPE_ORDER, true);
-            return [$ra === false ? 1 : 0, $ra === false ? $a : $ra] <=> [$rb === false ? 1 : 0, $rb === false ? $b : $rb];
-        });
+        uksort($types, fn ($a, $b) => HeatmapBuilder::typeRank((string) $a) <=> HeatmapBuilder::typeRank((string) $b));
 
         $parts = [];
         $hours = 0.0;
@@ -137,6 +130,79 @@ class PulseService extends Base
         }
 
         return $label.' · '.implode(', ', $parts).($names === [] ? '' : ' · '.implode(', ', $names));
+    }
+
+    /**
+     * One graph's year in a line, e.g. "42 events · 3.5 h logged in the last 12 months". Plain text.
+     *
+     * @param array{types:array<string,array{count:int,hours:float}>} $graph
+     */
+    public static function totalLine(array $graph): string
+    {
+        $events = 0;
+        $hours = 0.0;
+        foreach ($graph['types'] as $totals) {
+            $events += (int) $totals['count'];
+            $hours += (float) $totals['hours'];
+        }
+        $line = $events === 1 ? e('1 event') : e('%d events', $events);
+        if ($hours > 0) {
+            $line .= ' · '.e('%s logged', self::hours($hours));
+        }
+
+        return e('%s in the last 12 months', $line);
+    }
+
+    /**
+     * Swatches for the type and project modes of one graph (the person mode is just the name).
+     * Types in canonical order, unknown ones by name after them; projects by weight, with one
+     * "Other" for every project that got no colour slot. Labels are plain text.
+     *
+     * @param array{types:array<string,array{count:int,hours:float}>, projects:array<int,float>} $graph
+     * @param array<int,string> $projectColors
+     * @param array<int,string> $projectNames
+     * @return array{type:list<array{label:string,color:string}>, project:list<array{label:string,color:string}>}
+     */
+    public static function legend(array $graph, array $projectColors, array $projectNames): array
+    {
+        $types = array_keys(array_filter($graph['types'], fn ($t) => $t['count'] > 0 || $t['hours'] > 0));
+        $types = array_map('strval', $types);
+        usort($types, fn ($a, $b) => HeatmapBuilder::typeRank($a) <=> HeatmapBuilder::typeRank($b));
+
+        $weights = $graph['projects'];
+        $pids = array_keys($weights);
+        usort($pids, fn ($a, $b) => [$weights[$b], $a] <=> [$weights[$a], $b]);
+        $projects = [];
+        $other = false;
+        foreach ($pids as $pid) {
+            $color = $projectColors[$pid] ?? Palette::OTHER;
+            if ($color === Palette::OTHER) {
+                $other = true;
+                continue;
+            }
+            $projects[] = ['label' => (string) ($projectNames[$pid] ?? '#'.$pid), 'color' => $color];
+        }
+        if ($other) {
+            $projects[] = ['label' => e('Other'), 'color' => Palette::OTHER];
+        }
+
+        return [
+            'type' => array_map(fn ($type) => ['label' => self::typeLabel($type), 'color' => Palette::typeColour($type)], $types),
+            'project' => $projects,
+        ];
+    }
+
+    private static function typeLabel(string $type): string
+    {
+        return match ($type) {
+            'move' => e('Moves'),
+            'task' => e('Tasks'),
+            'comment' => e('Comments'),
+            'subtask' => e('Subtasks'),
+            'file' => e('Files'),
+            'time' => e('Time logged'),
+            default => $type,
+        };
     }
 
     /** Hours for display: one decimal, ".0" dropped; "<0.1 h" when some time rounds away. */

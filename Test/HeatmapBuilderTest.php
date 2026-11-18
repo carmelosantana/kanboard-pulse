@@ -96,6 +96,19 @@ class HeatmapBuilderTest extends Base
         $this->assertSame([1 => 4.5], $day['projects']);
     }
 
+    public function testGraphTotalsByTypeAndProject(): void
+    {
+        $graph = $this->build([
+            $this->row('2026-11-10 09:00', 'time', 0, 2.5, 3),
+            $this->row('2026-11-11 10:00', 'comment', 2, 0.0, 1),
+            $this->row('2026-11-12 10:00', 'comment', 1, 0.0, 3),
+            $this->row('2026-11-12 11:00', 'task', 3, 0.0, 1, 2), // other user: ignored
+        ]);
+
+        $this->assertSame(['time' => ['count' => 0, 'hours' => 2.5], 'comment' => ['count' => 3, 'hours' => 0.0]], $graph['types']);
+        $this->assertSame([3 => 3.5, 1 => 2.0], $graph['projects']);
+    }
+
     public function testTopTypeAndProjectWithTies(): void
     {
         $graph = $this->build([
@@ -141,6 +154,8 @@ class HeatmapBuilderTest extends Base
         $graph = $this->build([$this->row('2026-11-10 09:00', 'task', 4, 0.0, 1, 2)]);
 
         $this->assertSame(0.0, $graph['total']);
+        $this->assertSame([], $graph['types']);
+        $this->assertSame([], $graph['projects']);
         $this->assertCount(52 * 7 + 4, $graph['days']);
         foreach ($graph['days'] as $day) {
             $this->assertSame(0.0, $day['n']);
