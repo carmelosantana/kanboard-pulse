@@ -39,6 +39,16 @@ class AssetsTest extends Base
         $this->assertDoesNotMatchRegularExpression('/\.pulse-cell\[data-level="\d"\]\s*\{\s*opacity/', $css);
     }
 
+    public function testActiveModeButtonKeepsTheTextColourAndMarksThePersonHue(): void
+    {
+        // White text on a light series colour (yellow, pink) failed contrast.
+        $css = file_get_contents(self::CSS);
+        $this->assertSame(1, preg_match('/\.pulse-mode\.active\s*\{([^}]*)\}/', $css, $m));
+        $this->assertStringNotContainsString('#fff', $m[1]);
+        $this->assertStringNotContainsString('background: var(--pulse-c)', $m[1]);
+        $this->assertMatchesRegularExpression('/box-shadow:\s*inset 0 -3px 0 var\(--pulse-c\)/', $m[1]);
+    }
+
     public function testNoTemplateContainsInlineScript(): void
     {
         $files = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(__DIR__.'/../Template', \FilesystemIterator::SKIP_DOTS));
