@@ -87,6 +87,13 @@ class TemplatesTest extends Base
         $this->assertSame('0.3 h', PulseService::hours(0.25));
     }
 
+    public function testDayTipNeverCallsAColouredDayEmpty(): void
+    {
+        $day = ['types' => ['time' => ['count' => 0, 'hours' => 0.02]], 'projects' => [3 => 0.02]];
+
+        $this->assertSame('Nov 3, 2026 · <0.1 h logged · Website', PulseService::dayTip('2026-11-03', $day, [3 => 'Website']));
+    }
+
     public function testProjectMenuLinkHiddenForMember(): void
     {
         $project = $this->container['projectModel']->getById($this->pid);

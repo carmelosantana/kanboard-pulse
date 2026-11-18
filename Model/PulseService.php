@@ -121,7 +121,7 @@ class PulseService extends Base
                 $parts[] = self::countLabel((string) $type, $count);
             }
         }
-        if (round($hours, 1) > 0) {
+        if ($hours > 0) {
             $parts[] = t('%s logged', self::hours($hours));
         }
 
@@ -139,10 +139,13 @@ class PulseService extends Base
         return $label.' · '.implode(', ', $parts).($names === [] ? '' : ' · '.implode(', ', $names));
     }
 
-    /** Hours for display: one decimal, ".0" dropped. */
+    /** Hours for display: one decimal, ".0" dropped; "<0.1 h" when some time rounds away. */
     public static function hours(float $hours): string
     {
         $rounded = round($hours, 1);
+        if ($hours > 0 && $rounded == 0) {
+            return t('<0.1 h');
+        }
 
         return t('%s h', $rounded == (int) $rounded ? (string) (int) $rounded : number_format($rounded, 1));
     }
