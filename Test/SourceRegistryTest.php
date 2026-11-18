@@ -41,6 +41,17 @@ class SourceRegistryFailingSource implements ActivitySource
     }
 }
 
+/** A registry whose only built-in is the given source, to check built-in rows pass the same gate. */
+class SourceRegistryWithBuiltin extends SourceRegistry
+{
+    public ActivitySource $builtin;
+
+    protected function builtins(): array
+    {
+        return [$this->builtin];
+    }
+}
+
 class SourceRegistryTest extends Base
 {
     /** One project with a single task.create activity at ts 1000; returns the project id. */
@@ -144,6 +155,42 @@ class SourceRegistryTest extends Base
             [[1, $projectId, 'task'], [1, $projectId, 'commit'], [2, $projectId, 'commit']],
             array_map(fn ($r) => [$r['user_id'], $r['project_id'], $r['type']], $registry->fetchAll([], [$projectId], 0, 2000))
         );
+    }
+
+    public function testFetchAllDropsMalformedThirdPartyRowsAndNormalisesTheRest()
+    {
+        $projectId = $this->projectWithOneActivity();
+        $this->container['hook']->on('pulse:sources', fn () => new SourceRegistryFakeSource([
+            ['user_id' => 1, 'project_id' => $projectId, 'type' => 'commit', 'count' => 1, 'hours' => 0.0],                  // no ts
+            ['user_id' => 1, 'project_id' => $projectId, 'ts' => 1500, 'type' => ['commit'], 'count' => 1, 'hours' => 0.0], // array type
+            ['user_id' => 1, 'project_id' => $projectId, 'ts' => 1500, 'type' => '', 'count' => 1, 'hours' => 0.0],         // empty type
+            ['user_id' => 0, 'project_id' => $projectId, 'ts' => 1500, 'type' => 'commit', 'count' => 1, 'hours' => 0.0],   // no user
+            ['user_id' => 1, 'project_id' => $projectId, 'ts' => 2500, 'type' => 'commit', 'count' => 1, 'hours' => 0.0],   // after range
+            ['user_id' => '5', 'project_id' => (string) $projectId, 'ts' => '1500', 'type' => 'commit', 'count' => '2', 'hours' => '0.5'],
+        ]));
+
+        $rows = (new SourceRegistry($this->container))->fetchAll([], [$projectId], 0, 2000);
+
+        $this->assertSame(
+            ['user_id' => 5, 'project_id' => $projectId, 'ts' => 1500, 'type' => 'commit', 'count' => 2, 'hours' => 0.5],
+            $rows[1]
+        );
+        $this->assertCount(2, $rows);
+    }
+
+    public function testFetchAllDropsOutOfScopeBuiltinRows()
+    {
+        $row = fn (int $user, int $project, int $ts) => ['user_id' => $user, 'project_id' => $project, 'ts' => $ts, 'type' => 'task', 'count' => 1, 'hours' => 0.0];
+        $registry = new SourceRegistryWithBuiltin($this->container);
+        $registry->builtin = new SourceRegistryFakeSource([
+            $row(1, 3, 1500),
+            $row(1, 4, 1500),  // project not requested
+            $row(2, 3, 1500),  // user not requested
+            $row(1, 3, 999),   // before range
+            $row(1, 3, 2001),  // after range
+        ]);
+
+        $this->assertSame([$row(1, 3, 1500)], $registry->fetchAll([1], [3], 1000, 2000));
     }
 
     public function testRegistrySkipsNonSources()
