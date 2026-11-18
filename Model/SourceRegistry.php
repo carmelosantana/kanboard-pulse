@@ -55,8 +55,10 @@ class SourceRegistry extends Base
     }
 
     /**
-     * Rows from every source. A third-party source whose fetch() throws loses only its own
-     * rows; built-in sources are not guarded, so their bugs surface.
+     * Rows from every source; no projects means no rows. Third-party sources are untrusted:
+     * one whose fetch() throws loses only its own rows, and rows outside the requested
+     * projects (or users, when given) are dropped. Built-in sources are not guarded, so
+     * their bugs surface.
      *
      * @param list<int> $userIds
      * @param list<int> $projectIds
@@ -64,18 +66,39 @@ class SourceRegistry extends Base
      */
     public function fetchAll(array $userIds, array $projectIds, int $from, int $to): array
     {
+        if ($projectIds === []) {
+            return [];
+        }
+
         $rows = [];
         foreach ($this->builtins() as $source) {
             array_push($rows, ...$source->fetch($userIds, $projectIds, $from, $to));
         }
         foreach ($this->thirdParty() as $source) {
             try {
-                array_push($rows, ...$source->fetch($userIds, $projectIds, $from, $to));
+                array_push($rows, ...$this->inScope($source->fetch($userIds, $projectIds, $from, $to), $userIds, $projectIds));
             } catch (\Throwable $e) {
                 $this->logger->error('Pulse: activity source '.$source::class.' failed: '.$e->getMessage());
             }
         }
 
         return $rows;
+    }
+
+    /**
+     * Keeps rows whose project is requested and, when users are given, whose user is too.
+     *
+     * @param list<array> $rows
+     * @param list<int> $userIds
+     * @param list<int> $projectIds
+     * @return list<array>
+     */
+    private function inScope(array $rows, array $userIds, array $projectIds): array
+    {
+        $projects = array_flip($projectIds);
+        $users = array_flip($userIds);
+
+        return array_values(array_filter($rows, fn (array $row) => isset($projects[$row['project_id'] ?? ''])
+            && ($userIds === [] || isset($users[$row['user_id'] ?? '']))));
     }
 }

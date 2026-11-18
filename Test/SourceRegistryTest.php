@@ -12,6 +12,11 @@ use Kanboard\Plugin\Pulse\Model\SourceRegistry;
 
 class SourceRegistryFakeSource implements ActivitySource
 {
+    /** @param list<array>|null $rows fixed rows; null returns one row for user 1 in the first requested project */
+    public function __construct(private ?array $rows = null)
+    {
+    }
+
     public function types(): array
     {
         return ['commit'];
@@ -19,7 +24,7 @@ class SourceRegistryFakeSource implements ActivitySource
 
     public function fetch(array $userIds, array $projectIds, int $from, int $to): array
     {
-        return [['user_id' => 1, 'project_id' => 1, 'ts' => $from, 'type' => 'commit', 'count' => 1, 'hours' => 0.0]];
+        return $this->rows ?? [['user_id' => 1, 'project_id' => $projectIds[0] ?? 1, 'ts' => $from, 'type' => 'commit', 'count' => 1, 'hours' => 0.0]];
     }
 }
 
@@ -101,10 +106,43 @@ class SourceRegistryTest extends Base
         $this->assertInstanceOf(ManualTimeSource::class, $sources[2]);
         $this->assertInstanceOf(SourceRegistryFakeSource::class, $sources[3]);
 
-        // Built-ins return [] for an empty project list, so only the fake's row comes back.
+        $projectId = $this->projectWithOneActivity();
         $this->assertSame(
-            [['user_id' => 1, 'project_id' => 1, 'ts' => 100, 'type' => 'commit', 'count' => 1, 'hours' => 0.0]],
-            $registry->fetchAll([], [], 100, 200)
+            [
+                ['user_id' => 1, 'project_id' => $projectId, 'ts' => 1000, 'type' => 'task', 'count' => 1, 'hours' => 0.0],
+                ['user_id' => 1, 'project_id' => $projectId, 'ts' => 0, 'type' => 'commit', 'count' => 1, 'hours' => 0.0],
+            ],
+            $registry->fetchAll([], [$projectId], 0, 2000)
+        );
+    }
+
+    public function testFetchAllWithNoProjectsReturnsNothing()
+    {
+        $this->projectWithOneActivity();
+        $this->container['hook']->on('pulse:sources', fn () => new SourceRegistryFakeSource);
+
+        $this->assertSame([], (new SourceRegistry($this->container))->fetchAll([], [], 0, 2000));
+    }
+
+    public function testFetchAllDropsOutOfScopeThirdPartyRows()
+    {
+        $projectId = $this->projectWithOneActivity();
+        $row = fn (int $user, int $project) => ['user_id' => $user, 'project_id' => $project, 'ts' => 1500, 'type' => 'commit', 'count' => 1, 'hours' => 0.0];
+        $this->container['hook']->on('pulse:sources', fn () => new SourceRegistryFakeSource([
+            $row(1, $projectId),
+            $row(1, $projectId + 999), // project the viewer did not ask for
+            $row(2, $projectId),       // user outside the requested set
+        ]));
+        $registry = new SourceRegistry($this->container);
+
+        $this->assertSame(
+            [[1, $projectId, 'task'], [1, $projectId, 'commit']],
+            array_map(fn ($r) => [$r['user_id'], $r['project_id'], $r['type']], $registry->fetchAll([1], [$projectId], 0, 2000))
+        );
+        // No user filter: the other user's row stays, the foreign project's row still goes.
+        $this->assertSame(
+            [[1, $projectId, 'task'], [1, $projectId, 'commit'], [2, $projectId, 'commit']],
+            array_map(fn ($r) => [$r['user_id'], $r['project_id'], $r['type']], $registry->fetchAll([], [$projectId], 0, 2000))
         );
     }
 
