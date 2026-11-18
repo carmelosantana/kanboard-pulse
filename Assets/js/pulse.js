@@ -1,6 +1,6 @@
 // Pulse heatmap: per-graph colour-mode switch (person/type/project) and one shared hover/focus tooltip.
 // Loaded on every page via template:layout:js (CSP forbids inline script), so init() no-ops without a .pulse-graph.
-// Shade comes from CSS (opacity by data-level); this file only picks the hue.
+// Shade comes from CSS (opacity by data-level); this file only picks the hue, via the cell's --pulse-h.
 (function (window, document) {
   'use strict';
   var tip = null;
@@ -15,7 +15,7 @@
   function setMode(graph, mode) {
     var personColor = graph.style.getPropertyValue('--pulse-c').trim();
     var cells = graph.querySelectorAll('.pulse-cell');
-    for (var i = 0; i < cells.length; i++) cells[i].style.backgroundColor = colorFor(cells[i], mode, personColor) || '';
+    for (var i = 0; i < cells.length; i++) cells[i].style.setProperty('--pulse-h', colorFor(cells[i], mode, personColor) || '');
     var buttons = graph.querySelectorAll('[data-pulse-mode]');
     for (var j = 0; j < buttons.length; j++) {
       var on = buttons[j].dataset.pulseMode === mode;

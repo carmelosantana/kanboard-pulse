@@ -24,8 +24,19 @@ class AssetsTest extends Base
             $this->assertStringContainsString($needle, $css);
         }
         foreach ([1 => '.3', 2 => '.5', 3 => '.75', 4 => '1'] as $level => $opacity) {
-            $this->assertMatchesRegularExpression('/\[data-level="'.$level.'"\]\s*\{\s*opacity:\s*'.preg_quote($opacity, '/').';/', $css);
+            $this->assertMatchesRegularExpression('/\[data-level="'.$level.'"\]::before\s*\{\s*opacity:\s*'.preg_quote($opacity, '/').';/', $css);
         }
+    }
+
+    public function testShadeIsLaidOverTheEmptyCellNotThePage(): void
+    {
+        // Opacity on the cell itself blends into the page: on a dark theme a level-1 day was as dark
+        // as an empty one, and the focus outline faded with it. The hue now sits on ::before over
+        // an empty-coloured cell, and pulse.js swaps the hue through --pulse-h.
+        $css = file_get_contents(self::CSS);
+        $this->assertMatchesRegularExpression('/\.pulse-cell\s*\{[^}]*background-color:\s*var\(--pulse-empty\)/', $css);
+        $this->assertMatchesRegularExpression('/\.pulse-cell::before\s*\{[^}]*background-color:\s*var\(--pulse-h,\s*var\(--pulse-c\)\)/', $css);
+        $this->assertDoesNotMatchRegularExpression('/\.pulse-cell\[data-level="\d"\]\s*\{\s*opacity/', $css);
     }
 
     public function testNoTemplateContainsInlineScript(): void

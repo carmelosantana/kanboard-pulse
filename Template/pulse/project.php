@@ -8,15 +8,17 @@
     <?php if (empty($graphs)): ?>
         <p class="alert"><?= t('No activity in this project in the last 12 months') ?></p>
     <?php else: ?>
-    <div class="pulse-graphs">
-        <?php foreach ($graphs as $graph): ?>
-            <?= $this->render('Pulse:pulse/graph', [
-                'graph' => $graph,
-                'user_colors' => $user_colors,
-                'project_colors' => $project_colors,
-                'project_names' => $projects,
-            ]) ?>
-        <?php endforeach ?>
+    <div class="panel pulse-panel">
+        <div class="pulse-graphs">
+            <?php foreach ($graphs as $graph): ?>
+                <?= $this->render('Pulse:pulse/graph', [
+                    'graph' => $graph,
+                    'user_colors' => $user_colors,
+                    'project_colors' => $project_colors,
+                    'project_names' => $projects,
+                ]) ?>
+            <?php endforeach ?>
+        </div>
     </div>
     <?php endif ?>
 </section>

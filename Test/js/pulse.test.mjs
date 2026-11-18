@@ -54,14 +54,15 @@ test('a mode click recolours the cells and marks only that button pressed', () =
   P.init({ querySelectorAll: () => [graph] });
 
   graph.fire('click', { target: buttons[1] });
-  assert.equal(cells[0].style.backgroundColor, '#e11d48');
-  assert.equal(cells[1].style.backgroundColor, '');
+  assert.equal(cells[0].style['--pulse-h'], '#e11d48');
+  assert.equal(cells[1].style['--pulse-h'], '');
+  assert.equal(cells[0].style.backgroundColor, undefined, 'the hue goes through --pulse-h, the cell keeps its empty background');
   assert.equal(graph.dataset.pulseMode, 'type');
   assert.deepEqual(buttons.map((b) => b.getAttribute('aria-pressed')), ['false', 'true', 'false']);
   assert.deepEqual(buttons.map((b) => b.classList.contains('active')), [false, true, false]);
 
   graph.fire('click', { target: buttons[0] });
-  assert.equal(cells[0].style.backgroundColor, '#2563eb');
+  assert.equal(cells[0].style['--pulse-h'], '#2563eb');
 });
 
 test('init binds a graph only once', () => {

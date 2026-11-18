@@ -1,5 +1,7 @@
-/* Pulse activity heatmap. One column per week, Sunday on top; shade = opacity by data-level (4 steps + empty).
-   Hue: --pulse-c (the person) in CSS; pulse.js swaps in the type/project hue inline.
+/* Pulse activity heatmap. One column per week, Sunday on top. Each cell is the empty colour; its ::before
+   carries the hue, shaded by opacity per data-level (4 steps + empty), so a light day reads as a tint of
+   the empty cell on light and dark themes alike, and the cell's own focus outline stays at full strength.
+   Hue: --pulse-c (the person) in CSS; pulse.js swaps in the type/project hue through --pulse-h.
    Tokens fall back from ShadcnTheme (--border, --popover…) to core Kanboard (--table-border-color…) to literals. */
 .pulse-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-bottom: 16px; }
 .pulse-filters select { max-width: 100%; }
@@ -31,12 +33,15 @@
 .pulse-months span { grid-row: 1; white-space: nowrap; }
 
 .pulse-grid { display: grid; grid-auto-flow: column; grid-template-rows: repeat(7, 11px); grid-auto-columns: 11px; gap: 2px; width: max-content; }
-.pulse-cell { display: block; width: 11px; height: 11px; border-radius: 2px; background-color: var(--pulse-c); transition: background-color .15s ease; }
-.pulse-cell[data-level="0"] { opacity: 1; background-color: var(--pulse-empty); }
-.pulse-cell[data-level="1"] { opacity: .3; }
-.pulse-cell[data-level="2"] { opacity: .5; }
-.pulse-cell[data-level="3"] { opacity: .75; }
-.pulse-cell[data-level="4"] { opacity: 1; }
+.pulse-cell { position: relative; display: block; width: 11px; height: 11px; border-radius: 2px; background-color: var(--pulse-empty); }
+.pulse-cell::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; opacity: 0;
+  background-color: var(--pulse-h, var(--pulse-c)); transition: background-color .15s ease;
+}
+.pulse-cell[data-level="1"]::before { opacity: .3; }
+.pulse-cell[data-level="2"]::before { opacity: .5; }
+.pulse-cell[data-level="3"]::before { opacity: .75; }
+.pulse-cell[data-level="4"]::before { opacity: 1; }
 .pulse-cell:focus-visible { outline: 2px solid var(--ring, currentColor); outline-offset: 1px; }
 
 .pulse-tip {
@@ -50,5 +55,5 @@
 .pulse-tip[hidden] { display: none; }
 
 @media (prefers-reduced-motion: reduce) {
-  .pulse-cell, .pulse-mode { transition: none; }
+  .pulse-cell::before, .pulse-mode { transition: none; }
 }

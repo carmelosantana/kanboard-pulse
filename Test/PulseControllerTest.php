@@ -157,4 +157,15 @@ class PulseControllerTest extends Base
             'graphs are ordered by activity'
         );
     }
+
+    public function testProjectPageSitsInAPanel(): void
+    {
+        $this->event($this->alice, $this->p1);
+        $this->loginAs($this->alice);
+
+        $html = $this->call('project', ['project_id' => $this->p1]);
+
+        // Themes paint .panel; without it the graphs sit on the bare page background.
+        $this->assertMatchesRegularExpression('/<div class="panel pulse-panel">\s*<div class="pulse-graphs">/', $html);
+    }
 }
