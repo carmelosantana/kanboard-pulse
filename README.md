@@ -4,9 +4,6 @@ A GitHub-style activity heatmap for you, your agents and your projects. Pulse tu
 already records (the project activity stream, subtask timers and, with TimeReport, manually entered
 time) into one 12-month contribution graph per person, coloured by person, type of work or project.
 
-![Your activity page](docs/screenshots/activity-page.png)
-![A project's activity heatmap](docs/screenshots/project-heatmap.png)
-
 ## What it shows
 
 - **Your page** (dashboard sidebar and avatar menu, **Activity**): your graph, plus one graph per
@@ -110,7 +107,6 @@ A small example, counting commits a git plugin stores in its own table:
 ```php
 namespace Kanboard\Plugin\GitLog;
 
-use Kanboard\Core\Base;
 use Kanboard\Core\Plugin\Base as PluginBase;
 
 class Plugin extends PluginBase
@@ -171,7 +167,9 @@ A listener that returns anything other than an `ActivitySource` (like the `null`
 
 ## For theme authors
 
-The graph partial (`Pulse:pulse/graph`) is plain markup styled by `Assets/css/pulse.css`. Each
+The graph partial (`Pulse:pulse/graph`) is plain markup styled by `Assets/css/pulse.css`. On the
+project page the graphs sit in `<div class="panel pulse-panel">`, so a theme that paints `.panel`
+gives them its surface; target `.pulse-panel` to style that page only. Each
 `.pulse-cell` is painted with `--pulse-empty` (from ShadcnTheme's `--border`, else core's
 `--table-border-color`, else `#e5e5e5`) and its `::before` carries the hue (`--pulse-h`, else the
 person colour `--pulse-c`) at an opacity set by `data-level` (0-4). The tooltip uses `--popover`,
@@ -190,8 +188,11 @@ docker exec kb-suite php /var/www/app/plugins/Pulse/Test/seed/seed-demo.php
 ```
 
 The seed creates `demo.ana` (manager of "Demo Web"), `demo.ben` (member of "Demo Web" and "Demo
-Ops") and `demo.ana.bot` (Ana's agent), with a year of every activity type. Their dev-only password
-is in the script. Re-running rebuilds the two Demo projects without duplicating anything.
+Ops", identifiers `PULSEDEMOWEB` / `PULSEDEMOOPS`) and `demo.ana.bot` (Ana's agent), with a year of
+every activity type. Their dev-only password is in the script. Re-running rebuilds only the projects
+with those identifiers, without duplicating anything. It refuses to run outside the dev container,
+when a `webhook_url` is configured, or when a "Demo Web"/"Demo Ops" project exists without the demo
+identifier, and it drops every queued job so seeding sends no notifications or webhooks.
 
 ## License
 

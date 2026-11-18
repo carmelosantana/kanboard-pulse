@@ -5,13 +5,17 @@
  *   docker exec kb-suite php /var/www/app/plugins/Pulse/Test/seed/seed-demo.php
  *
  * Creates (or refreshes) users demo.ana, demo.ben and the agent demo.ana.bot, the projects
- * "Demo Web" and "Demo Ops", and 12 months of every activity type Pulse counts. Re-running
- * deletes and rebuilds only the two Demo projects, so nothing is duplicated; the users are
- * kept. Everything else in the database is left alone.
+ * "Demo Web" and "Demo Ops" (identifiers PULSEDEMOWEB / PULSEDEMOOPS), and 12 months of every
+ * activity type Pulse counts. Re-running deletes and rebuilds only the projects carrying those
+ * identifiers, so nothing is duplicated; the users are kept. Everything else is left alone.
  *
- * Guard: runs only from the CLI inside the suite's dev container, recognised by Docker's
- * /.dockerenv plus the suite's own entrypoint (/usr/local/bin/entrypoint-dev.sh, mounted from
- * testing/entrypoint-dev.sh), on SQLite. Anywhere else it exits 1 without touching anything.
+ * Guards, all checked before anything is written; each failure exits 1:
+ * - CLI only, inside the suite's dev container: Docker's /.dockerenv plus the suite's own
+ *   entrypoint (/usr/local/bin/entrypoint-dev.sh, mounted from testing/entrypoint-dev.sh), on SQLite;
+ * - no webhook_url configured (the dev DB is an import of production);
+ * - a project named "Demo Web" / "Demo Ops" without the demo identifier is never touched: refuse.
+ * Core models queue event jobs (notifications, webhooks, other plugins' subscribers); the queue
+ * is replaced by one that drops every job, so seeding notifies nothing and no one.
  */
 
 use Kanboard\Core\Security\Role;
@@ -22,7 +26,7 @@ use Kanboard\Model\TaskModel;
 use Kanboard\Model\CommentModel;
 
 const DEMO_PASSWORD = 'pulse-demo-2026'; // dev-only, demo users only
-const DEMO_PROJECTS = ['Demo Web', 'Demo Ops'];
+const DEMO_PROJECTS = ['PULSEDEMOWEB' => 'Demo Web', 'PULSEDEMOOPS' => 'Demo Ops']; // identifier => name
 const KANBOARD_ROOT = '/var/www/app';
 
 function refuse(string $why): never
@@ -46,6 +50,37 @@ if (DB_DRIVER !== 'sqlite') {
 
 /** @var Pimple\Container $container */
 $db = $container['db'];
+
+if (trim((string) $container['configModel']->get('webhook_url')) !== '') {
+    refuse('a webhook_url is configured; seeding could reach a real endpoint');
+}
+
+foreach (DEMO_PROJECTS as $identifier => $name) {
+    $project = $container['projectModel']->getByName($name);
+    if ($project && $project['identifier'] !== $identifier) {
+        refuse("a project named \"$name\" exists without the identifier $identifier; it is not seed data");
+    }
+    $tagged = $container['projectModel']->getByIdentifier($identifier);
+    if ($tagged && $tagged['name'] !== $name) {
+        refuse("project $identifier is named \"{$tagged['name']}\", expected \"$name\"");
+    }
+}
+
+/** Drops every job: no notifications, webhooks or third-party subscribers fire while seeding. */
+final class DroppingQueueManager extends Kanboard\Core\Queue\QueueManager
+{
+    public int $dropped = 0;
+
+    public function push(Kanboard\Job\BaseJob $job)
+    {
+        $this->dropped++;
+        return $this;
+    }
+}
+$queue = new DroppingQueueManager($container);
+unset($container['queueManager']); // may already be frozen; unset then set replaces it
+$container['queueManager'] = $queue;
+
 mt_srand(20261118); // same data shape on every run
 
 // ---- users -------------------------------------------------------------------------------
@@ -54,7 +89,7 @@ function demoUser(Pimple\Container $c, string $username, string $name): int
 {
     $user = $c['userModel']->getByUsername($username);
     if ($user) {
-        $c['userModel']->update(['id' => $user['id'], 'password' => DEMO_PASSWORD, 'name' => $name]);
+        $c['userModel']->update(['id' => $user['id'], 'password' => DEMO_PASSWORD, 'name' => $name, 'role' => Role::APP_USER, 'is_active' => 1]);
         return (int) $user['id'];
     }
     $id = $c['userModel']->create([
@@ -82,8 +117,8 @@ if (class_exists($agentTable)) {
 
 // ---- projects (rebuilt every run) ----------------------------------------------------------
 
-foreach (DEMO_PROJECTS as $name) {
-    $project = $container['projectModel']->getByName($name);
+foreach (array_keys(DEMO_PROJECTS) as $identifier) {
+    $project = $container['projectModel']->getByIdentifier($identifier); // never by name alone
     if ($project) {
         foreach ($db->table(TaskModel::TABLE)->eq('project_id', $project['id'])->findAllByColumn('id') as $taskId) {
             $container['taskFileModel']->removeAll($taskId);
@@ -92,8 +127,11 @@ foreach (DEMO_PROJECTS as $name) {
     }
 }
 
-$web = (int) $container['projectModel']->create(['name' => 'Demo Web'], $ana, true); // ana manages it
-$ops = (int) $container['projectModel']->create(['name' => 'Demo Ops']);
+$web = (int) $container['projectModel']->create(['name' => 'Demo Web', 'identifier' => 'PULSEDEMOWEB'], $ana, true); // ana manages it
+$ops = (int) $container['projectModel']->create(['name' => 'Demo Ops', 'identifier' => 'PULSEDEMOOPS']);
+if ($web === 0 || $ops === 0) {
+    refuse('could not create the Demo projects');
+}
 $container['projectUserRoleModel']->addUser($web, $ben, Role::PROJECT_MEMBER);
 $container['projectUserRoleModel']->addUser($web, $bot, Role::PROJECT_MEMBER);
 $container['projectUserRoleModel']->addUser($ops, $ben, Role::PROJECT_MEMBER);
@@ -244,3 +282,4 @@ printf("seed-demo: %d activity rows, %d timers, %s manual time rows\n",
     $count(ProjectActivityModel::TABLE, 'project_id', [$web, $ops]),
     $db->table(SubtaskTimeTrackingModel::TABLE)->in('user_id', [$ana, $ben, $bot])->count(),
     $hasManualLedger ? (string) $db->table('timereport_manual_time')->in('user_id', [$ana, $ben, $bot])->count() : 'no');
+printf("seed-demo: %d queued jobs dropped (no notifications or webhooks sent)\n", $queue->dropped);
