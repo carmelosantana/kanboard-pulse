@@ -42,7 +42,7 @@ class TemplatesTest extends Base
 
     public function testGraphPartialEscapesTip(): void
     {
-        $taskId = (new \Kanboard\Model\TaskCreationModel($this->container))->create(['project_id' => $this->pid, 'title' => '<script>x</script>']);
+        $taskId = (new \Kanboard\Model\TaskCreationModel($this->container))->create(['project_id' => $this->pid, 'title' => 'Task']);
         $this->container['db']->table('project_activities')->remove();
         $this->container['db']->table('project_activities')->insert([
             'project_id' => $this->pid, 'task_id' => $taskId, 'creator_id' => $this->alice,

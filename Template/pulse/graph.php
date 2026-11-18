@@ -31,7 +31,7 @@ if (count($months) > 1 && $months[1]['column'] - $months[0]['column'] < 3) {
 
     <?php if ($graph['total'] <= 0): ?>
     <p class="pulse-empty"><?= t('No activity in the last 12 months') ?></p>
-    <?php else: ?>
+    <?php endif ?>
     <div class="pulse-body">
         <div class="pulse-weekdays" aria-hidden="true">
             <span></span><span><?= t('Mon') ?></span><span></span><span><?= t('Wed') ?></span><span></span><span><?= t('Fri') ?></span><span></span>
@@ -61,5 +61,4 @@ if (count($months) > 1 && $months[1]['column'] - $months[0]['column'] < 3) {
             </div>
         </div>
     </div>
-    <?php endif ?>
 </div>

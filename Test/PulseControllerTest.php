@@ -94,6 +94,9 @@ class PulseControllerTest extends Base
         $html = $this->call('index', []);
 
         $this->assertStringContainsString('No activity in the last 12 months', $html);
+        $this->assertStringContainsString('class="pulse-grid"', $html, 'an empty graph keeps its blank grid');
+        $this->assertStringContainsString('data-level="0"', $html);
+        $this->assertStringNotContainsString('data-level="1"', $html);
         $this->assertStringContainsString('<select name="project_id"', $html);
     }
 
