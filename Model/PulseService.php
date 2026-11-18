@@ -96,7 +96,7 @@ class PulseService extends Base
 
     /**
      * Plain-text breakdown of one day, e.g. "Nov 3, 2026 · 4 moves, 3 comments, 1.5 h logged · Website, Ops".
-     * Not escaped: the template escapes it.
+     * Plain text (e() not t(), so nothing is escaped twice): the template escapes it.
      *
      * @param array{types:array<string,array{count:int,hours:float}>, projects:array<int,float>} $day
      * @param array<int,string> $projectNames
@@ -122,11 +122,11 @@ class PulseService extends Base
             }
         }
         if ($hours > 0) {
-            $parts[] = t('%s logged', self::hours($hours));
+            $parts[] = e('%s logged', self::hours($hours));
         }
 
         if ($parts === []) {
-            return $label.' · '.t('No activity');
+            return $label.' · '.e('No activity');
         }
 
         $projects = $day['projects'];
@@ -144,20 +144,20 @@ class PulseService extends Base
     {
         $rounded = round($hours, 1);
         if ($hours > 0 && $rounded == 0) {
-            return t('<0.1 h');
+            return e('<0.1 h');
         }
 
-        return t('%s h', $rounded == (int) $rounded ? (string) (int) $rounded : number_format($rounded, 1));
+        return e('%s h', $rounded == (int) $rounded ? (string) (int) $rounded : number_format($rounded, 1));
     }
 
     private static function countLabel(string $type, int $count): string
     {
         return match ($type) {
-            'move' => $count === 1 ? t('1 move') : t('%d moves', $count),
-            'task' => $count === 1 ? t('1 task event') : t('%d task events', $count),
-            'comment' => $count === 1 ? t('1 comment') : t('%d comments', $count),
-            'subtask' => $count === 1 ? t('1 subtask') : t('%d subtasks', $count),
-            'file' => $count === 1 ? t('1 file') : t('%d files', $count),
+            'move' => $count === 1 ? e('1 move') : e('%d moves', $count),
+            'task' => $count === 1 ? e('1 task event') : e('%d task events', $count),
+            'comment' => $count === 1 ? e('1 comment') : e('%d comments', $count),
+            'subtask' => $count === 1 ? e('1 subtask') : e('%d subtasks', $count),
+            'file' => $count === 1 ? e('1 file') : e('%d files', $count),
             default => $count.' '.$type,
         };
     }
