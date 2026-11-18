@@ -22,6 +22,18 @@ dominated the day) or **project**. Hover or keyboard-focus a day for the breakdo
 `Nov 3, 2026 · 4 moves, 3 comments, 1.5 h logged · Website, Ops`. At phone width only the graph
 scrolls sideways.
 
+Under each graph a line totals the year (`42 events · 3.5 h logged in the last 12 months`) next to a
+legend that follows the colour mode: the person's name, the types present in that graph, or its
+projects (with **Other** for those beyond the eight colour slots).
+
+Each grid is a single tab stop, on today. The arrow keys move between days (up and down by a day,
+left and right by a week), Home and End jump to the first and last day, and the tooltip follows the
+focused day. Escape closes the tooltip from anywhere on the page.
+
+Colours are stable within a page and, as far as eight slots allow, across pages: a person or project
+keeps its slot (picked by id) unless another one on the same page already took it, so a person's hue
+can differ between two pages when slots collide.
+
 What counts:
 
 | Type | From | Rule |
@@ -98,7 +110,8 @@ interface ActivitySource
 - Return one row per event (`count` 1, `hours` 0) or per block of time (`count` 0, `hours` > 0), with
   `ts` a Unix timestamp in `[$from, $to]`. Pulse buckets by day in the viewer's timezone.
 - Only query inside `$projectIds`; if it is empty, return `[]` without querying. Pulse also drops any
-  row outside the requested projects and users, so a buggy source cannot leak activity.
+  row outside the requested projects, users or range, and any row with a missing id, `ts` or `type`,
+  so a buggy source cannot leak or break activity.
 - A source that throws loses only its own rows (the error is logged); the page still renders.
 - Unknown type keys get a fallback colour and are labelled with the key in the tooltip.
 
@@ -174,7 +187,10 @@ gives them its surface; target `.pulse-panel` to style that page only. Each
 `--table-border-color`, else `#e5e5e5`) and its `::before` carries the hue (`--pulse-h`, else the
 person colour `--pulse-c`) at an opacity set by `data-level` (0-4). The tooltip uses `--popover`,
 `--popover-foreground` and `--border` when present. Cells carry `data-date`, `data-level`,
-`data-type` and `data-project`.
+`data-type` and `data-project`. The footer (`.pulse-footer`) holds `.pulse-total` and one
+`.pulse-legend[data-pulse-legend]` per mode (the inactive ones `hidden`); legend text uses
+`--muted-foreground` and each `.pulse-swatch` carries the colour. The active mode button keeps the
+text colour on `--accent` and shows the person colour as a 3px inset underline.
 
 ## Development
 
